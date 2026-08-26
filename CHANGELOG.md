@@ -1,6 +1,18 @@
 # Release Notes
 
-## [Unreleased](https://github.com/laravel/laravel/compare/v13.10.1...13.x)
+## [Unreleased](https://github.com/laravel/laravel/compare/v0.0.1...main)
+
+## [v0.0.1](https://github.com/laravel/laravel/compare/v13.10.1...v0.0.1) - 2026-08-26
+
+### What's Changed
+
+* Add docs-first PRD, ADR, and spec framework by [@codearachnid](https://github.com/codearachnid) in https://github.com/codearachnid/drive-log/pull/1
+
+### New Contributors
+
+* [@codearachnid](https://github.com/codearachnid) made their first contribution in https://github.com/codearachnid/drive-log/pull/1
+
+**Full Changelog**: https://github.com/codearachnid/drive-log/commits/v0.0.1
 
 ## [v13.10.1](https://github.com/laravel/laravel/compare/v13.10.0...v13.10.1) - 2026-08-25
 

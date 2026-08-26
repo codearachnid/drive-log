@@ -143,7 +143,7 @@ Unique on `(log_book_id, user_id)`. Revocation is a timestamp; rows are never de
 | `log_book_id` | `char(30)` FK | `ON DELETE RESTRICT` |
 | `driver_user_id` | `char(30)` FK | |
 | `supervisor_member_id` | `char(30)` FK nullable | Who was in the passenger seat |
-| `started_at` | `datetime` | |
+| `started_at` | `datetime` nullable | Null only while `draft`, which autosaves before a start time is chosen (PRD FR-4.7). Required on every other status except `void` |
 | `ended_at` | `datetime` nullable | Null while active |
 | `timezone_snapshot` | `varchar(64)` | Copied from the book at creation |
 | `duration_minutes` | `integer` nullable | |
@@ -167,16 +167,26 @@ Constraints, in portable form. The unique index runs everywhere. The check const
 CREATE UNIQUE INDEX drives_one_active_per_book
   ON drives (active_lock);
 
--- The minute split must be exact
+-- The minute split must be present and exact. CHECK passes when the expression is unknown,
+-- and NULL + n = m is unknown, so each column is required explicitly.
 ALTER TABLE drives ADD CONSTRAINT drives_minutes_balance
   CHECK (
     status IN ('active','draft','void')
-    OR (day_minutes + night_minutes = duration_minutes)
+    OR (
+      duration_minutes IS NOT NULL
+      AND day_minutes IS NOT NULL
+      AND night_minutes IS NOT NULL
+      AND day_minutes + night_minutes = duration_minutes
+    )
   );
 
--- A completed drive must have an end
-ALTER TABLE drives ADD CONSTRAINT drives_completed_has_end
-  CHECK (status IN ('active','draft') OR ended_at IS NOT NULL);
+-- An active drive has a start; a completed drive has a start and an end. Drafts may lack either
+-- while being filled in, and a draft may be voided without ever getting one.
+ALTER TABLE drives ADD CONSTRAINT drives_timestamps_by_status
+  CHECK (
+    status IN ('draft','void')
+    OR (started_at IS NOT NULL AND (status = 'active' OR ended_at IS NOT NULL))
+  );
 
 ALTER TABLE drives ADD CONSTRAINT drives_end_after_start
   CHECK (ended_at IS NULL OR ended_at > started_at);
@@ -279,16 +289,18 @@ enum ShareType: string
 This spec has no user-facing behavior. The behavior it guarantees is that the following are impossible at the model level on every driver, and at the database level on MySQL, MariaDB, and PostgreSQL, regardless of application code above the models:
 
 1. Two drives active on one log book simultaneously
-2. A completed drive whose day and night minutes do not sum to its duration
+2. A completed drive whose day and night minutes are missing or do not sum to its duration
 3. A drive ending before it started
-4. A log book without an owner
-5. Deleting a drive, member, or user that has attestations attached
-6. Two pending ownership transfers on one book
-7. A log book whose owner is also its driver
+4. An active drive without a start, or a completed drive without a start and an end
+5. A log book without an owner
+6. Deleting a drive, member, or user that has attestations attached
+7. Two pending ownership transfers on one book
+8. A log book whose owner is also its driver
 
 ## Edge cases
 
-- **Drive rows with null minute columns.** Active and draft drives have not been classified yet. The check constraint exempts those statuses explicitly rather than allowing nulls to pass silently.
+- **Drive rows with null minute columns.** Active and draft drives have not been classified yet. The check constraint exempts those statuses explicitly and requires all three columns on every other status, because a `CHECK` whose expression is unknown passes and a null in the sum would otherwise slip through.
+- **Drafts may lack timestamps.** A draft persists within 750ms of each keystroke, before a start time exists. `started_at` is nullable for that reason and `drives_timestamps_by_status` requires it everywhere else. `void` is exempt from both timestamps because an abandoned draft moves there with neither.
 - **A voided drive keeps its computed minutes.** Void excludes it from totals through query filters, not by nulling data. Nulling would destroy the record of what was voided.
 - **`users.email` is nullable and non-unique.** A spouse and partner sharing an address is normal. Do not add a unique index.
 - **`phone_e164` uniqueness across a recycled number.** Out of scope here; `SPEC-002` handles the auth-side implications.
@@ -300,6 +312,8 @@ Constraint tests, each run twice: through the model, asserting the domain except
 
 - Insert a second `active` drive on the same book, expect a unique violation
 - Insert an `attested` drive where `day_minutes + night_minutes != duration_minutes`, expect a check violation
+- Insert an `attested` drive with a null `night_minutes`, expect a check violation
+- Insert a `pending_attestation` drive with a null `ended_at`, and an `active` drive with a null `started_at`, expect a check violation for each
 - Insert a drive with `ended_at < started_at`, expect a check violation
 - Delete a drive holding an attestation, expect a restrict violation
 - Delete a member holding an attestation, expect a restrict violation
@@ -322,7 +336,7 @@ Factories cover: a log book with an owner, driver, and three members of differin
 ## Acceptance criteria
 
 - [ ] `php artisan migrate:fresh` succeeds on SQLite, MySQL 8, and PostgreSQL 16
-- [ ] All seven constraint tests pass, each asserting the database rejects the write
+- [ ] All nine constraint tests pass, each asserting the database rejects the write
 - [ ] `ShareType::Driver->mayAttest()` returns `false` and a test asserts it
 - [ ] Every model has a factory and the dev seeder produces a browsable log book with signed and unsigned drives
 - [ ] The `drives_minutes_balance` constraint is present on drivers that support it, its exemption list matches the enum cases exactly, and the model guard asserts the same rule on every driver

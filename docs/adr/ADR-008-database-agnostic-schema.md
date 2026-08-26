@@ -36,7 +36,7 @@ Write the schema in Laravel's schema builder using only types every supported dr
 
 **Check constraints**
 
-- `drives_minutes_balance`, `drives_completed_has_end`, `drives_end_after_start`, and `log_books_owner_not_driver` are added with `DB::statement` in the migration when `DB::getDriverName()` is `mysql`, `mariadb`, or `pgsql`. On SQLite they are skipped.
+- `drives_minutes_balance`, `drives_timestamps_by_status`, `drives_end_after_start`, and `log_books_owner_not_driver` are added with `DB::statement` in the migration when `DB::getDriverName()` is `mysql`, `mariadb`, or `pgsql`. On SQLite they are skipped.
 - Every check constraint has a `saving` guard on its model that throws a domain exception on violation. The guard is the enforcement on SQLite and the first line of defense elsewhere. A raw write that bypasses the model is stopped by the database on the engines that can.
 
 **Locking**

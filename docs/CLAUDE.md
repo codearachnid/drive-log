@@ -8,7 +8,7 @@ Instructions for Claude Code sessions operating on this documentation tree. Root
 
 Read order for a cold session:
 
-1. `docs/prd/PRD-drive-log.md` sections 1 through 6, for the problem and the functional requirements
+1. `docs/prd/PRD-drive-log.md` sections 1 through 6, for the problem and the functional requirements, then `docs/prd/UX-principles.md` for how it should feel
 2. `docs/adr/README.md` for the decision index
 3. Whichever ADRs the task touches
 4. `docs/specs/README.md` for what is specified and what is not
@@ -39,9 +39,11 @@ These are load-bearing domain rules established in the ADRs. Do not weaken them,
 11. **Authorization is re-checked in every Livewire action method**, not only on mount. Livewire public properties round-trip through the client and are user input. `ADR-005`.
 12. **Reports are immutable snapshots** with a content hash. Re-rendering reproduces the original exactly. `ADR-006`.
 13. **Unattested drives never contribute to certified totals.** They are listed separately. `ADR-006`.
-14. **Magic link tokens are stored hashed, single-use, 10 minute TTL.** `ADR-001`.
+14. **Magic link tokens are stored hashed and single-use, with lifetime set by purpose:** 10 minutes for `login`, 7 days for `invite` and `sign`, the transfer's own expiry for `transfer`. An expired link is a re-issue button, never an error. `ADR-001`.
 15. **The owner is never the driver.** Check constraint on `log_books`. The certifying adult originates the book and names the driver by phone number. `PRD FR-2.3`.
 16. **Carrier-reserved SMS words are never commands.** `STOP`, `END`, `START`, and their siblings belong to the opt-out layer. Timer keywords are `BEGIN`/`GO`, `DONE`/`FINISH`, and `CONTINUE`, and every timer message carries an authenticated link as the fallback. `ADR-007`.
+17. **A forgotten timer never gets an invented end time.** After 8 hours a drive moves to `needs_correction` with `ended_at` null and waits for a human. `ADR-010`.
+18. **The app asks once and reminds once.** One signature request per drive, one reminder after 3 days, one weekly owner digest. No other unsolicited message about a drive, and the words "overdue", "late", and "urgent" appear nowhere. `ADR-009`, `docs/prd/UX-principles.md`.
 
 ## Decisions already closed
 
@@ -62,6 +64,13 @@ Do not reopen these in an implementation session. If one is genuinely wrong, wri
 - Every accepted member reads the whole log book
 - SMS keyword timer control trusts the sender's phone number for start and end only, with an authenticated link in every timer message
 - Non-driver members with edit rights modify unsigned drives; the owner unsigns an attested drive to edit and re-sign it; all of it is logged and none of it prints on the report
+- Link lifetime follows purpose; login is 10 minutes, invite and sign are 7 days, transfer matches the transfer
+- The signature request goes out when the drive ends, to the chosen supervisor or else the owner, and lands on the signing screen for that drive
+- Drives can be discarded from the active screen, ended at a chosen time, and corrected after auto-close through `needs_correction`
+- Restricted-window minutes are stored as a flag at completion and excluded from certified totals
+- Location comes from a bundled ZIP centroid table; there is no geocoding service
+- "Delete my log book" means archive and scrub; signed history is never deleted
+- Tone is gracious and a little fun by requirement, per `docs/prd/UX-principles.md`; "within 60 seconds" is not a goal anywhere
 
 ## Writing conventions
 
@@ -87,4 +96,4 @@ The ADR wins. Fix the spec. If the ADR is the thing that is wrong, stop and say 
 
 ## Open questions that gate work
 
-None. Every question in `docs/prd/PRD-drive-log.md` section 11 was answered on 2026-08-26 and the answers are recorded there. Do not reopen them in an implementation session; if one is genuinely wrong, say so and write a superseding ADR.
+One. Whether a log book may have a driver who has no phone of their own, recorded under "Open" in `docs/prd/PRD-drive-log.md` section 11. It gates the `log_books.driver_user_id` nullability in `SPEC-001` and nothing else. Every other question in section 11 was answered on 2026-08-26 and the answers are recorded there. Do not reopen them in an implementation session; if one is genuinely wrong, say so and write a superseding ADR.

@@ -26,8 +26,9 @@ Implementation:
 
 - Phone numbers are normalized to E.164 on input and stored that way. `phone_e164` is the unique key on `users`.
 - A login request mints a cryptographically random 32-byte token. Only its SHA-256 hash is persisted in `magic_links`. The plaintext exists in the SMS and nowhere else.
-- Tokens are single-use, expire in 10 minutes, and are invalidated when a newer token is minted for the same number.
-- Tokens carry a `purpose` and a `context` payload, so the same primitive serves login, share invitations, and ownership transfer acceptance. Invite links deep-link straight to the target log book rather than a generic dashboard.
+- Tokens are single-use. Lifetime follows purpose: `login` tokens expire in 10 minutes and are invalidated when a newer login token is minted for the same number; `invite` and `sign` tokens live 7 days and are independent of each other and of logins, because an invitation or a signature request is opened when the recipient gets to it, not when it arrives; `transfer` tokens live as long as the transfer they belong to.
+- Tokens carry a `purpose` and a `context` payload, so the same primitive serves login, share invitations, signature requests, and ownership transfer acceptance. Invite links land on the signing screen if a drive is waiting for the invitee, otherwise on the log book. Sign links land on the signing screen for the drive in question. Nothing lands on a generic dashboard.
+- An expired or consumed link is never an error page. It is one sentence and one button that re-issues a token for the same number, purpose, and context. A token consumed seconds earlier by a carrier prefetch is re-issued without the button.
 - Consuming a token creates the user if the number is unknown, sets `phone_verified_at`, and establishes a standard Laravel session.
 - Sessions last 30 days with sliding expiry.
 - Rate limiting is applied on both the phone number and the request IP. The response body and timing are identical for known and unknown numbers.
@@ -49,6 +50,7 @@ Implementation:
 - SIM swap and shared-device access are real attack vectors. The blast radius is a family driving log, which is proportionate, but it is not nothing.
 - Number reassignment means a recycled phone number could reach a stale account. Mitigated by revocable memberships and the 30-day session ceiling.
 - Links in SMS are sometimes prefetched by carrier or messaging-app scanners, which can consume a single-use token before the human taps it. Mitigation: on a consumed-but-recently-consumed token, issue a fresh link automatically rather than showing an error.
+- Seven-day invite and sign tokens widen the window in which a forwarded or leaked text grants access. Bounded: the link authenticates only the phone number it was sent to, the membership can be revoked, and a signature still records the signer's number and IP. Accepted, because a 10-minute invite is a dead link for most of the people it is sent to.
 
 **Neutral**
 

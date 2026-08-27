@@ -7,13 +7,15 @@ product: drive-log
 owner: Tim Wood
 created: 2026-08-26
 updated: 2026-08-26
-implements: [FR-1.1, FR-2.1, FR-3.1, FR-4.1, FR-5.1, FR-6.1, FR-7.1, FR-8.1]
+implements: [FR-1.1, FR-1.3, FR-2.1, FR-3.1, FR-4.1, FR-4.5, FR-4.9, FR-5.1, FR-6.1, FR-6.11, FR-7.1, FR-8.1]
 decided_by:
   - "[[ADR-002-per-logbook-membership-authorization]]"
   - "[[ADR-003-dual-time-classification]]"
   - "[[ADR-004-attestation-immutability]]"
   - "[[ADR-007-sms-keyword-timer-control]]"
   - "[[ADR-008-database-agnostic-schema]]"
+  - "[[ADR-009-signature-requests-and-gracious-reminders]]"
+  - "[[ADR-010-forgiving-drive-lifecycle]]"
 tags: [spec, schema, migrations, database]
 ---
 
@@ -51,6 +53,10 @@ Every table, constraint, and model exists so subsequent slices have something to
 | Prefixed ULIDs | House standard | `HasReferenceId` trait on every model, no auto-increment primary keys |
 | The timer is also driven by SMS | `ADR-007` | `entry_method` gains `sms`; `next_checkin_at` on `drives` |
 | The schema runs on any Laravel-supported relational database | `ADR-008` | Portable column types, unique-on-nullable lock columns instead of partial indexes, check constraints only where supported and mirrored by model guards |
+| A forgotten timer waits for a human rather than getting an invented end time | `ADR-010` | `DriveStatus::NeedsCorrection`, exempt from the minute and end-time checks exactly as `active` is |
+| Signature requests and one gracious reminder are tracked per drive | `ADR-009` | `sign_requested_at` and `sign_reminded_at` on `drives`; `sign` joins the magic link purposes |
+| Restricted-window drives are classified once and kept out of certified totals | PRD FR-4.9, FR-8.7 | `restricted_window` on `drives`, computed at completion alongside the minute split |
+| Link lifetime follows purpose | `ADR-001` | `expires_at` is set from `purpose` at minting; no single TTL constant |
 
 ## Data model
 
@@ -78,8 +84,9 @@ Column type conventions: every timestamp is a UTC `datetime`; timezone awareness
 | `phone_verified_at` | `datetime` nullable | Set on first successful magic link consumption |
 | `name` | `varchar(120)` nullable | Required before the user may attest |
 | `email` | `varchar(255)` nullable | Not unique. Two family members may share one |
-| `timezone` | `varchar(64)` | Default `America/New_York` |
 | `created_at`, `updated_at` | `datetime` | |
+
+There is no timezone on the user. Every time in the product renders in the log book's timezone, so a per-person timezone would be collected and never read.
 
 Globally scoped. This is the only table outside the log book isolation boundary, per `ADR-002`.
 
@@ -90,14 +97,14 @@ Globally scoped. This is the only table outside the log book isolation boundary,
 | `id` | `char(30)` PK | `mgl_` |
 | `phone_e164` | `varchar(20)` | Indexed. Not a foreign key, since the user may not exist yet |
 | `token_hash` | `char(64)` | **unique**, SHA-256 of the plaintext token |
-| `purpose` | `varchar(20)` | `login`, `invite`, `transfer` |
-| `context` | `json` nullable | Deep link target, for example `{"log_book_id": "lbk_..."}` |
-| `expires_at` | `datetime` | |
+| `purpose` | `varchar(20)` | `login`, `invite`, `sign`, `transfer` |
+| `context` | `json` nullable | Deep link target, for example `{"log_book_id": "lbk_..."}` or `{"drive_id": "drv_..."}` for `sign` |
+| `expires_at` | `datetime` | Set from `purpose` at minting: 10 minutes for `login`, 7 days for `invite` and `sign`, the transfer's own `expires_at` for `transfer`. PRD FR-1.3 |
 | `consumed_at` | `datetime` nullable | |
 | `request_ip` | `varchar(45)` nullable | |
 | `created_at` | `datetime` | |
 
-Index on `(phone_e164, consumed_at)` for invalidating prior tokens. Scheduled purge of rows older than 30 days.
+Index on `(phone_e164, purpose, consumed_at)` for invalidating prior tokens. Only `login` tokens invalidate their predecessors; an outstanding `invite` or `sign` link is never killed by a later login. Scheduled purge of rows older than 30 days.
 
 ### `log_books`
 
@@ -119,6 +126,8 @@ Index on `(phone_e164, consumed_at)` for invalidating prior tokens. Scheduled pu
 Goals live per book rather than in config, which is the seam a future jurisdiction rule pack extends without a schema change. They are thresholds, not caps; nothing in the schema or the application stops logging past them.
 
 Check constraint `log_books_owner_not_driver` asserts `owner_user_id <> driver_user_id`. The certifying adult originates the book and names the driver; a book where the two are the same person cannot exist, and an ownership transfer to the driver is rejected by the same constraint.
+
+`driver_user_id` being not null is the one column in this spec with an open question against it: a driver who has no phone of their own cannot be represented. If the answer in PRD section 11 is to allow it, this column becomes nullable, a `driver_name` column is added to the book, and the check constraint becomes `owner_user_id <> driver_user_id OR driver_user_id IS NULL`. Decide before this migration is written.
 
 ### `log_book_members`
 
@@ -155,7 +164,10 @@ Unique on `(log_book_id, user_id)`. Revocation is a timestamp; rows are never de
 | `conditions` | `json` nullable | Weather, road type, traffic |
 | `notes` | `text` nullable | |
 | `entry_method` | `varchar(10)` | `live`, `manual`, `sms` |
+| `restricted_window` | `boolean` | Default `false`. True when any part of the drive falls between 00:00 and 04:00 in `timezone_snapshot`. Computed at completion with the minute split, never at read time. PRD FR-4.9 |
 | `next_checkin_at` | `datetime` nullable | `started_at + 2h` on start, null while a check-in awaits reply, `now + 45m` on `CONTINUE`, cleared on end. `ADR-007` |
+| `sign_requested_at` | `datetime` nullable | When the signature request SMS was sent for this drive. `ADR-009` |
+| `sign_reminded_at` | `datetime` nullable | When the single reminder was sent. Null means not yet; set means never again for this drive. `ADR-009` |
 | `status` | `varchar(24)` | `DriveStatus` enum |
 | `active_lock` | `char(30)` nullable | Equals `log_book_id` while `status = active`, null otherwise. **Unique.** Set and cleared in the same write as `status`. `ADR-008` |
 
@@ -171,7 +183,7 @@ CREATE UNIQUE INDEX drives_one_active_per_book
 -- and NULL + n = m is unknown, so each column is required explicitly.
 ALTER TABLE drives ADD CONSTRAINT drives_minutes_balance
   CHECK (
-    status IN ('active','draft','void')
+    status IN ('active','draft','void','needs_correction')
     OR (
       duration_minutes IS NOT NULL
       AND day_minutes IS NOT NULL
@@ -181,11 +193,12 @@ ALTER TABLE drives ADD CONSTRAINT drives_minutes_balance
   );
 
 -- An active drive has a start; a completed drive has a start and an end. Drafts may lack either
--- while being filled in, and a draft may be voided without ever getting one.
+-- while being filled in, and a draft may be voided without ever getting one. A drive in
+-- needs_correction has a start and is waiting for a human to supply the end; nothing invents one.
 ALTER TABLE drives ADD CONSTRAINT drives_timestamps_by_status
   CHECK (
     status IN ('draft','void')
-    OR (started_at IS NOT NULL AND (status = 'active' OR ended_at IS NOT NULL))
+    OR (started_at IS NOT NULL AND (status IN ('active','needs_correction') OR ended_at IS NOT NULL))
   );
 
 ALTER TABLE drives ADD CONSTRAINT drives_end_after_start
@@ -274,7 +287,7 @@ enum ShareType: string
 
 ### `DriveStatus` enum
 
-`Active`, `Draft`, `PendingAttestation`, `Attested`, `Void`, with `canTransitionTo(DriveStatus $to): bool` encoding the state machine from PRD section 6.6.
+`Active`, `Draft`, `NeedsCorrection`, `PendingAttestation`, `Attested`, `Void`, with `canTransitionTo(DriveStatus $to): bool` encoding the state machine from PRD section 6.6, and `isUnclassified(): bool` returning true for `Active`, `Draft`, `NeedsCorrection`, and `Void`. The check constraint exemption lists and the model guard both read from `isUnclassified()` so they cannot drift from the enum.
 
 ### `Daypart` enum
 
@@ -291,7 +304,7 @@ This spec has no user-facing behavior. The behavior it guarantees is that the fo
 1. Two drives active on one log book simultaneously
 2. A completed drive whose day and night minutes are missing or do not sum to its duration
 3. A drive ending before it started
-4. An active drive without a start, or a completed drive without a start and an end
+4. An active or needs-correction drive without a start, or a completed drive without a start and an end
 5. A log book without an owner
 6. Deleting a drive, member, or user that has attestations attached
 7. Two pending ownership transfers on one book
@@ -301,6 +314,8 @@ This spec has no user-facing behavior. The behavior it guarantees is that the fo
 
 - **Drive rows with null minute columns.** Active and draft drives have not been classified yet. The check constraint exempts those statuses explicitly and requires all three columns on every other status, because a `CHECK` whose expression is unknown passes and a null in the sum would otherwise slip through.
 - **Drafts may lack timestamps.** A draft persists within 750ms of each keystroke, before a start time exists. `started_at` is nullable for that reason and `drives_timestamps_by_status` requires it everywhere else. `void` is exempt from both timestamps because an abandoned draft moves there with neither.
+- **A `needs_correction` drive has a start and no end.** The 8-hour job sets the status and clears `active_lock` in one write, so the driver can start a new drive while the old one waits. It is exempt from the minute and end-time checks exactly as `active` is, and it is classified only when a human sets `ended_at`, at which point it moves to `pending_attestation` through the same completion path as a live end. `ADR-010`.
+- **`restricted_window` is a stored fact, not a derived one.** Like the minute split, it is computed at completion and never recomputed on display, so a signed drive's report treatment cannot change under its signature.
 - **A voided drive keeps its computed minutes.** Void excludes it from totals through query filters, not by nulling data. Nulling would destroy the record of what was voided.
 - **`users.email` is nullable and non-unique.** A spouse and partner sharing an address is normal. Do not add a unique index.
 - **`phone_e164` uniqueness across a recycled number.** Out of scope here; `SPEC-002` handles the auth-side implications.
@@ -314,6 +329,7 @@ Constraint tests, each run twice: through the model, asserting the domain except
 - Insert an `attested` drive where `day_minutes + night_minutes != duration_minutes`, expect a check violation
 - Insert an `attested` drive with a null `night_minutes`, expect a check violation
 - Insert a `pending_attestation` drive with a null `ended_at`, and an `active` drive with a null `started_at`, expect a check violation for each
+- Insert a `needs_correction` drive with a start and a null `ended_at`, expect success; with a null `started_at`, expect a check violation
 - Insert a drive with `ended_at < started_at`, expect a check violation
 - Delete a drive holding an attestation, expect a restrict violation
 - Delete a member holding an attestation, expect a restrict violation
@@ -324,14 +340,15 @@ Enum tests:
 
 - `ShareType::Driver->mayAttest()` is `false`
 - Every case of `ShareType` returns a non-empty `label()`
-- The `DriveStatus` transition matrix, every pair, against the state diagram in PRD section 6.6
+- The `DriveStatus` transition matrix, every pair, against the state diagram in PRD section 6.6, including `Active -> NeedsCorrection`, `NeedsCorrection -> PendingAttestation`, and `NeedsCorrection -> Void`
+- `DriveStatus::isUnclassified()` is true for exactly `Active`, `Draft`, `NeedsCorrection`, `Void`
 
 Model tests:
 
 - Every model generates its correct ULID prefix
 - `Attestation` throws when updating any column other than `voided_at` or `voided_reason`
 
-Factories cover: a log book with an owner, driver, and three members of differing share types; drives in each status; live and voided attestations.
+Factories cover: a log book with an owner, driver, and three members of differing share types; drives in each status including `needs_correction` and one with `restricted_window = true`; live and voided attestations.
 
 ## Acceptance criteria
 
@@ -339,7 +356,8 @@ Factories cover: a log book with an owner, driver, and three members of differin
 - [ ] All nine constraint tests pass, each asserting the database rejects the write
 - [ ] `ShareType::Driver->mayAttest()` returns `false` and a test asserts it
 - [ ] Every model has a factory and the dev seeder produces a browsable log book with signed and unsigned drives
-- [ ] The `drives_minutes_balance` constraint is present on drivers that support it, its exemption list matches the enum cases exactly, and the model guard asserts the same rule on every driver
+- [ ] The `drives_minutes_balance` constraint is present on drivers that support it, its exemption list matches `DriveStatus::isUnclassified()` exactly, and the model guard asserts the same rule on every driver
+- [ ] `magic_links.expires_at` is set from `purpose` and a test asserts each of the four lifetimes
 - [ ] `spatie/laravel-activitylog` is installed and logging on `LogBookMember`, `Drive`, `Attestation`, and `OwnershipTransfer`
 - [ ] No table uses an auto-increment primary key
 - [ ] No foreign key anywhere in the schema uses `ON DELETE CASCADE`

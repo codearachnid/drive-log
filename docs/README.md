@@ -20,6 +20,7 @@ docs/
 | If you want to | Read |
 | --- | --- |
 | Understand the product | [PRD](prd/PRD-drive-log.md) sections 1 to 4 |
+| Understand how it should feel | [UX principles](prd/UX-principles.md) |
 | Understand the data model | [PRD](prd/PRD-drive-log.md) section 5 |
 | Understand a decision | [ADR index](adr/README.md) |
 | Build something | [Spec index](specs/README.md) |
@@ -29,7 +30,9 @@ docs/
 
 A teen driver taps start and stop from their phone. The app computes how many of those minutes fell after sunset at the log book's location, because a fixed clock rule is wrong by up to three hours depending on the season and that error is large enough to change whether a family meets the requirement.
 
-Whoever was in the passenger seat is texted a link, authenticates by phone number alone with no account setup, and signs the entry. The driver cannot sign their own entries. At the end, the owner generates an immutable, printable report carrying every signature, each signer's relationship and contact details, and a content hash.
+Whoever was in the passenger seat is texted a link when the drive ends, authenticates by phone number alone with no account setup, and signs the entry whenever they get to it. The app asks once and reminds once; it never nags. The driver cannot sign their own entries. Mistakes are one tap to fix. At the end, the owner generates an immutable, printable report carrying every signature, each signer's relationship and contact details, and a content hash, and shares it as a PDF.
+
+The product is meant to be easy and a little fun, on purpose. Families have already done their time in the DMV line.
 
 ## Architectural decisions
 
@@ -43,6 +46,8 @@ Whoever was in the passenger seat is texted a link, authenticates by phone numbe
 | [006](adr/ADR-006-report-snapshot-and-pdf.md) | Certification report as an immutable snapshot | Proposed |
 | [007](adr/ADR-007-sms-keyword-timer-control.md) | SMS keyword timer control with an authenticated link fallback | Proposed |
 | [008](adr/ADR-008-database-agnostic-schema.md) | Database-agnostic schema with portable invariant enforcement | Proposed |
+| [009](adr/ADR-009-signature-requests-and-gracious-reminders.md) | Signature requests at drive end, one gracious reminder, batch signing | Proposed |
+| [010](adr/ADR-010-forgiving-drive-lifecycle.md) | Forgiving drive lifecycle: discard, end at a chosen time, needs-correction | Proposed |
 
 ## Stack
 

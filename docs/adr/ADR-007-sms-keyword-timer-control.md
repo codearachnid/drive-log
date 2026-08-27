@@ -43,15 +43,15 @@ Accept timer commands by SMS using non-reserved keywords, trust the sender's pho
 
 **The link fallback**
 
-- Every timer message, whether the start confirmation, the check-in, or the auto-close notice, carries a magic link with `purpose = login` and a `context` deep link to the active drive. Tapping it authenticates per [ADR-001: Phone-first magic link auth](ADR-001-phone-first-magic-link-auth.md) and lands on the drive with the end control visible. This is the path when keywords fail, when the sender is ambiguous, and for anyone who prefers tapping.
+- Every timer message, whether the start confirmation, the check-in, or the needs-correction notice, carries a magic link with `purpose = login` and a `context` deep link to the active drive. Tapping it authenticates per [ADR-001: Phone-first magic link auth](ADR-001-phone-first-magic-link-auth.md) and lands on the drive with the end control visible. This is the path when keywords fail, when the sender is ambiguous, and for anyone who prefers tapping.
 
 **Long-drive check-in**
 
 - `drives.next_checkin_at` is set to `started_at + 2 hours` on start.
-- A scheduled job, every minute, sends a check-in to the owner for each active drive whose `next_checkin_at` has passed, then nulls the column while awaiting a reply. The message names the driver and the elapsed time, states the `CONTINUE` and `DONE` keywords, and carries the link.
-- `CONTINUE` sets `next_checkin_at = now + 45 minutes`. The cycle repeats for as long as the owner keeps replying.
-- `DONE` from the owner ends the drive at the time of the reply.
-- No reply leaves the drive running until the 8-hour auto-close from PRD FR-4.5. The check-in is a nudge, not a deadline.
+- A scheduled job, every minute, sends a check-in to the driver and to the owner for each active drive whose `next_checkin_at` has passed, then nulls the column while awaiting a reply. The driver is included because the person who forgot the timer is usually the one holding the phone. The message names the driver and the elapsed time, states the keywords that apply to the recipient, and carries the link. It is worded as a question, never as a warning.
+- `CONTINUE` from the owner sets `next_checkin_at = now + 45 minutes`. The cycle repeats for as long as the owner keeps replying.
+- `DONE` from the driver or the owner ends the drive at the time of the reply.
+- No reply leaves the drive running until the 8-hour move to `needs_correction` from PRD FR-4.5 and `ADR-010`. The check-in is a nudge, not a deadline.
 
 **Webhook**
 

@@ -34,12 +34,15 @@ Generating a report writes an immutable snapshot; rendering reads only from that
 - A SHA-256 `content_hash` of the canonical payload is stored and printed in the report footer alongside the report ID.
 - Re-rendering an existing report reproduces it exactly, regardless of subsequent changes to the log book.
 - Generating a new report never mutates an old one. Reports accumulate.
-- Only the owner can generate. Any member with attest rights can preview a live, clearly watermarked draft.
+- Only the owner can generate. Any member with attest rights can preview a live, clearly watermarked draft. Every generated report stays listed on the report screen with its ID, range, totals, and hash, and can be printed or downloaded again.
+- A public page at `/verify/{report}` shows the generation date, range, certified totals, and content hash for a report ID, and nothing else, so a third party holding a printout can check it without an account. The PDF itself is never reachable by URL; sharing it means the owner sends it, through the phone's share sheet.
 
 **Totals discipline**
 
 - Certified totals include attested drives only.
 - Drives in `pending_attestation` are listed in a separate, clearly labeled section with their own subtotal, so the owner can see what is outstanding without it contaminating the number being certified.
+- Drives with `restricted_window = true` are likewise excluded from certified totals and listed in their own section, per PRD FR-8.7. Drives in `needs_correction` have no minutes and appear on the readiness checklist rather than in the report.
+- Before generation the owner sees a readiness checklist of everything that will be excluded and why, with a reminder action per waiting signer. Nothing on it blocks generation; it exists so the owner is never surprised by their own report.
 - Voided attestations are excluded from the report body. The activity log retains them.
 - Totals are running tallies. The summary reports logged hours against the 45 and 15 hour requirements and keeps counting past them; nothing caps or truncates logged hours. Instructor-supervised drives count identically to any other attested drive.
 

@@ -40,13 +40,14 @@ The timer is server-authoritative in truth and client-computed in display:
 2. Alpine computes elapsed time locally against that fixed origin. No polling drives the display, so a dropped connection cannot freeze or reset the clock.
 3. A low-frequency heartbeat, roughly every 60 seconds, confirms liveness and lets other members see the active drive. Heartbeat failure is silent to the driver.
 4. Tapping End captures the client timestamp of the tap, then submits. If the request fails, it retries with backoff and submits the original tap time, not the eventual delivery time.
-5. A scheduled job auto-closes any drive active beyond 8 hours, flags it, and surfaces it to the owner for correction rather than discarding it.
+5. A scheduled job moves any drive active beyond 8 hours to `needs_correction` with no end time, and texts the driver and owner a link to set one, per [ADR-010: Forgiving drive lifecycle](ADR-010-forgiving-drive-lifecycle.md). The same screen offers Discard and "I forgot to stop" so the common mistakes are fixed before the job ever runs.
+6. The start response carries the server's current time alongside `started_at`; the client computes a one-time offset so a phone clock a minute off still displays the right elapsed time.
 
-Because the drive row exists from the moment Start is tapped, an unrecoverable client failure still leaves a recoverable record with a known start time.
+Because the drive row exists from the moment Start is tapped, an unrecoverable client failure still leaves a recoverable record with a known start time, and no code path ever fills in an end time a person did not supply.
 
 **Flux usage**
 
-Standard Flux primitives: `flux:input`, `flux:field`, `flux:select`, `flux:button`, `flux:modal`, `flux:badge`, `flux:callout`, `flux:card`, `flux:checkbox`, `flux:textarea`. Pro components `flux:table` and `flux:date-picker` are proposed for the drive list and manual entry, pending verification against current Flux docs before the build commits to them. Dark mode is a first-class target rather than an afterthought, since evening use is the norm.
+Standard Flux primitives: `flux:input`, `flux:field`, `flux:select`, `flux:button`, `flux:modal`, `flux:badge`, `flux:callout`, `flux:card`, `flux:checkbox`, `flux:textarea`. Pro components `flux:table` and `flux:date-picker` are proposed for the drive list and manual entry, pending verification against current Flux docs before the build commits to them. Dark mode is a first-class target rather than an afterthought, since evening use is the norm, and it switches on automatically after local sunset per `docs/prd/UX-principles.md`. Every screen and string is built to that document; it is the acceptance bar for `SPEC-009`, not a style suggestion.
 
 ## Consequences
 

@@ -97,14 +97,14 @@ Globally scoped. This is the only table outside the log book isolation boundary,
 | `id` | `char(30)` PK | `mgl_` |
 | `phone_e164` | `varchar(20)` | Indexed. Not a foreign key, since the user may not exist yet |
 | `token_hash` | `char(64)` | **unique**, SHA-256 of the plaintext token |
-| `purpose` | `varchar(20)` | `login`, `invite`, `sign`, `transfer` |
-| `context` | `json` nullable | Deep link target, for example `{"log_book_id": "lbk_..."}` or `{"drive_id": "drv_..."}` for `sign` |
-| `expires_at` | `datetime` | Set from `purpose` at minting: 10 minutes for `login`, 7 days for `invite` and `sign`, the transfer's own `expires_at` for `transfer`. PRD FR-1.3 |
+| `purpose` | `varchar(20)` | `login`, `invite`, `sign`, `correct`, `transfer` |
+| `context` | `json` nullable | Deep link target, for example `{"log_book_id": "lbk_..."}` or `{"drive_id": "drv_..."}` for `sign` and `correct` |
+| `expires_at` | `datetime` | Set from `purpose` at minting: 10 minutes for `login`, 7 days for `invite`, `sign`, and `correct`, the transfer's own `expires_at` for `transfer`. PRD FR-1.3 |
 | `consumed_at` | `datetime` nullable | |
 | `request_ip` | `varchar(45)` nullable | |
 | `created_at` | `datetime` | |
 
-Index on `(phone_e164, purpose, consumed_at)` for invalidating prior tokens. Only `login` tokens invalidate their predecessors; an outstanding `invite` or `sign` link is never killed by a later login. Scheduled purge of rows older than 30 days.
+Index on `(phone_e164, purpose, consumed_at)` for invalidating prior tokens. Only `login` tokens invalidate their predecessors; an outstanding `invite`, `sign`, or `correct` link is never killed by a later login. Scheduled purge of rows older than 30 days.
 
 ### `log_books`
 
@@ -357,7 +357,7 @@ Factories cover: a log book with an owner, driver, and three members of differin
 - [ ] `ShareType::Driver->mayAttest()` returns `false` and a test asserts it
 - [ ] Every model has a factory and the dev seeder produces a browsable log book with signed and unsigned drives
 - [ ] The `drives_minutes_balance` constraint is present on drivers that support it, its exemption list matches `DriveStatus::isUnclassified()` exactly, and the model guard asserts the same rule on every driver
-- [ ] `magic_links.expires_at` is set from `purpose` and a test asserts each of the four lifetimes
+- [ ] `magic_links.expires_at` is set from `purpose` and a test asserts each of the five lifetimes
 - [ ] `spatie/laravel-activitylog` is installed and logging on `LogBookMember`, `Drive`, `Attestation`, and `OwnershipTransfer`
 - [ ] No table uses an auto-increment primary key
 - [ ] No foreign key anywhere in the schema uses `ON DELETE CASCADE`

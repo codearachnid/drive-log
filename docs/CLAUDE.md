@@ -39,7 +39,7 @@ These are load-bearing domain rules established in the ADRs. Do not weaken them,
 11. **Authorization is re-checked in every Livewire action method**, not only on mount. Livewire public properties round-trip through the client and are user input. `ADR-005`.
 12. **Reports are immutable snapshots** with a content hash. Re-rendering reproduces the original exactly. `ADR-006`.
 13. **Unattested drives never contribute to certified totals.** They are listed separately. `ADR-006`.
-14. **Magic link tokens are stored hashed and single-use, with lifetime set by purpose:** 10 minutes for `login`, 7 days for `invite` and `sign`, the transfer's own expiry for `transfer`. An expired link is a re-issue button, never an error. `ADR-001`.
+14. **Magic link tokens are stored hashed and single-use, with lifetime set by purpose:** 10 minutes for `login`, 7 days for `invite`, `sign`, and `correct`, the transfer's own expiry for `transfer`. An expired link is a re-issue button, never an error. `ADR-001`.
 15. **The owner is never the driver.** Check constraint on `log_books`. The certifying adult originates the book and names the driver by phone number. `PRD FR-2.3`.
 16. **Carrier-reserved SMS words are never commands.** `STOP`, `END`, `START`, and their siblings belong to the opt-out layer. Timer keywords are `BEGIN`/`GO`, `DONE`/`FINISH`, and `CONTINUE`, and every timer message carries an authenticated link as the fallback. `ADR-007`.
 17. **A forgotten timer never gets an invented end time.** After 8 hours a drive moves to `needs_correction` with `ended_at` null and waits for a human. `ADR-010`.
@@ -64,7 +64,7 @@ Do not reopen these in an implementation session. If one is genuinely wrong, wri
 - Every accepted member reads the whole log book
 - SMS keyword timer control trusts the sender's phone number for start and end only, with an authenticated link in every timer message
 - Non-driver members with edit rights modify unsigned drives; the owner unsigns an attested drive to edit and re-sign it; all of it is logged and none of it prints on the report
-- Link lifetime follows purpose; login is 10 minutes, invite and sign are 7 days, transfer matches the transfer
+- Link lifetime follows purpose; login is 10 minutes, invite, sign, and correct are 7 days, transfer matches the transfer
 - The signature request goes out when the drive ends, to the chosen supervisor or else the owner, and lands on the signing screen for that drive
 - Drives can be discarded from the active screen, ended at a chosen time, and corrected after auto-close through `needs_correction`
 - Restricted-window minutes are stored as a flag at completion and excluded from certified totals

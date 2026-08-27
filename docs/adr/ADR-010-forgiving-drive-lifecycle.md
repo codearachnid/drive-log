@@ -41,7 +41,7 @@ Give the driver the tools to fix the three common mistakes in the moment, and wh
 **Needs correction**
 
 - `DriveStatus::NeedsCorrection` is added. A scheduled job moves any drive that has been `active` for more than 8 hours to `needs_correction`, clears `active_lock`, clears `next_checkin_at`, and leaves `ended_at` null. Nothing is classified.
-- The driver and the owner are each texted a short, friendly note with an authenticated link that lands on the drive with the end time field focused. The message is worded as "looks like the timer kept running", never as an error.
+- The driver and the owner are each texted a short, friendly note with a magic link of `purpose = correct` and `context = {"drive_id": ...}`, which lands on that drive with the end time field focused. It lives 7 days and is not invalidated by later logins, like `sign`, because the drive is no longer active when the text arrives and the person fixing it will not open it within the 10-minute `login` window. The message is worded as "looks like the timer kept running", never as an error.
 - Setting an end time on a `needs_correction` drive runs the completion path and moves it to `pending_attestation`. Discarding moves it to `void`. Those are the only two exits.
 - `needs_correction` is exempt from `drives_minutes_balance` and from the end-time half of `drives_timestamps_by_status`, exactly as `active` is, per `SPEC-001` and `ADR-008`. The model guard reads the exemption list from `DriveStatus::isUnclassified()` so the enum, the constraint, and the guard cannot disagree.
 - Because `active_lock` is cleared, the driver can start a new drive while an old one waits for correction. The dashboard shows the waiting drive as a gentle card, not a blocker.

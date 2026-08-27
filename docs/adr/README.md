@@ -14,6 +14,8 @@ One decision per file. Numbered sequentially, never reused, never renumbered.
 | [006](ADR-006-report-snapshot-and-pdf.md) | Certification report as an immutable snapshot with PDF rendering | Proposed | 2026-08-26 | |
 | [007](ADR-007-sms-keyword-timer-control.md) | SMS keyword control of the drive timer with an authenticated link fallback | Proposed | 2026-08-26 | |
 | [008](ADR-008-database-agnostic-schema.md) | Database-agnostic schema with portable invariant enforcement | Proposed | 2026-08-26 | |
+| [009](ADR-009-signature-requests-and-gracious-reminders.md) | Signature requests at drive end, one gracious reminder, batch signing | Proposed | 2026-08-26 | |
+| [010](ADR-010-forgiving-drive-lifecycle.md) | Forgiving drive lifecycle: discard, end at a chosen time, needs-correction | Proposed | 2026-08-26 | |
 
 ## Status values
 

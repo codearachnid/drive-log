@@ -65,3 +65,7 @@ Produce a PRD and supporting ADRs for a Laravel application that logs a teen dri
 - [ ] Start 10DLC registration
 - [ ] Scaffold M1: schema, prefixed ULID models, policies, factories, phone auth with log SMS driver
 - [ ] Write the day/night classification test matrix before writing the classifier
+
+## Corrections
+
+- Decision 5 above says Livewire 3. The stack is Livewire 4, per `ADR-005` and the platform decisions session of the same day. Left in place because this log is append-only.

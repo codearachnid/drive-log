@@ -1,6 +1,14 @@
 # Release Notes
 
-## [Unreleased](https://github.com/laravel/laravel/compare/v0.0.1...main)
+## [Unreleased](https://github.com/laravel/laravel/compare/v0.0.2...main)
+
+## [v0.0.2](https://github.com/laravel/laravel/compare/v0.0.1...v0.0.2) - 2026-08-27
+
+### What's Changed
+
+* Add S3 adapter and refine product docs by [@codearachnid](https://github.com/codearachnid) in https://github.com/codearachnid/drive-log/pull/2
+
+**Full Changelog**: https://github.com/codearachnid/drive-log/compare/v0.0.1...v0.0.2
 
 ## [v0.0.1](https://github.com/laravel/laravel/compare/v13.10.1...v0.0.1) - 2026-08-26
 

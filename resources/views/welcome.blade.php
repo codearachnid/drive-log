@@ -7,7 +7,9 @@
     <meta name="description" content="A practice-driving log for Virginia learner's permits. Time drives by text message, track night hours by actual sunset, and collect a signature from the adult who was in the car.">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800|dancing-script:600" rel="stylesheet">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @if (file_exists(public_path('hot')) || file_exists(public_path('build/manifest.json')))
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @endif
 </head>
 <body class="min-h-screen bg-stone-50 text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
 
@@ -64,7 +66,8 @@
             <h2 class="text-xl font-bold tracking-tight">Get started, or sign back in</h2>
             <p class="mt-1 mb-6 text-sm text-stone-600 dark:text-stone-400">Drive Log works over text message — no passwords, ever.</p>
 
-            <form action="#" class="flex flex-col gap-5">
+            <form method="POST" action="#" class="flex flex-col gap-5">
+                @csrf
                 <div>
                     <label for="phone" class="mb-1.5 block text-sm font-semibold">Mobile phone number<span aria-hidden="true">*</span></label>
                     <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="(555) 123-4567"
